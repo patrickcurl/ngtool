@@ -35,16 +35,17 @@ do
 	read domain
 done
 
-while [ "$root" == "" ]
-do
-	echo -e $"Please provide a full directory e.g. /home/user/projects/myproject/public"
-	read root
-done
+
 
 ### if root dir starts with '/', don't use /var/www as default starting point
 
 if [ "$action" == 'create' ]
 	then
+		while [ "$root" == "" ]
+		do
+			echo -e $"Please provide a full directory e.g. /home/user/projects/myproject/public"
+			read root
+		done
 		### check if domain already exists
 		if [ -e $sitesAvailable$domain ]; then
 			echo -e $"This domain already exists.\nPlease Try Another one"
@@ -169,23 +170,7 @@ if [ "$action" == 'create' ]
 			rm $sitesAvailable$domain
 		fi
 
-		### check if directory exists or not
-		if [ -d $root ]; then
-			echo -e $"Delete host root directory ? (s/n)"
-			read deldir
-
-			if [ "$deldir" == 's' -o "$deldir" == 'S' ]; then
-				### Delete the directory
-				rm -rf $root
-				echo -e $"Directory deleted"
-			else
-				echo -e $"Host directory conserved"
-			fi
-		else
-			echo -e $"Host directory not found. Ignored"
-		fi
-
 		### show the finished message
-		echo -e $"Complete!\nYou just removed Virtual Host $domain"
+		echo -e $"Complete!\nYou just removed Virtual Host $domain. \nThe root folder still exists. You'll need to manually delete it."
 		exit 0;
 fi
