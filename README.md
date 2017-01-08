@@ -41,3 +41,6 @@ to delete a virtual host
 ```bash
 $ sudo ng delete mysite.dev
 ```
+
+## License ##
+MIT : Basically do whatever just provide copyright notice w/ all derivatives. 
