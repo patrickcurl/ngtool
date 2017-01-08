@@ -1,8 +1,6 @@
-NgTool
-This is modified from: 
-https://github.com/RoverWire/virtualhost
-===========
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=Y2JHAQRU77CCE)
 
+===========
 Bash Script to allow create or delete apache/nginx virtual hosts on Ubuntu on a quick way.
 
 ## Installation ##
@@ -41,29 +39,10 @@ $ sudo ng [create | delete] [domain] [/full/path/to/project/dir]
 to create a new virtual host:
 
 ```bash
-$ sudo ng create mysite.dev /home/patrick/projects/laravel/myapp/public
+$ sudo ng create mysite.dev /home/patrick/projects/laravel/mysite/public
 ```
 to delete a virtual host
 
 ```bash
 $ sudo ng delete mysite.dev
-```
-
-to delete a virtual host with custom directory name:
-
-```
-$ sudo virtualhost delete anothersite.dev my_dir
-```
-### Localization
-
-For Apache:
-
-```bash
-$ sudo cp /path/to/locale/<language>/virtualhost.mo /usr/share/locale/<language>/LC_MESSAGES/
-```
-
-For NGINX:
-
-```bash
-$ sudo cp /path/to/locale/<language>/virtualhost-nginx.mo /usr/share/locale/<language>/LC_MESSAGES/
 ```
