@@ -1,0 +1,191 @@
+#!/bin/bash
+### Set Language
+TEXTDOMAIN=virtualhost
+
+### Set default parameters
+action=$1
+domain=$2
+root=$3
+# Put owner/group that nginx must run over for your system. 
+# The default on ubuntu would be user: www-data group: www-data.
+owner=patrick
+group=users
+sitesEnable='/etc/nginx/sites-enabled/'
+sitesAvailable='/etc/nginx/sites-available/'
+# Change this to match what your system uses.
+#arch
+restart='systemctl restart nginx'
+#ubuntu
+# restart=service nginx restart
+
+if [ "$(whoami)" != 'root' ]; then
+	echo $"You have no permission to run $0 as non-root user. Use sudo"
+		exit 1;
+fi
+
+if [ "$action" != 'create' ] && [ "$action" != 'delete' ]
+	then
+		echo $"You need to prompt for action (create or delete) -- Lower-case only"
+		exit 1;
+fi
+
+while [ "$domain" == "" ]
+do
+	echo -e $"Please provide domain. e.g. mysite.dev"
+	read domain
+done
+
+while [ "$root" == "" ]
+do
+	echo -e $"Please provide a full directory e.g. /home/user/projects/myproject/public"
+	read root
+done
+
+### if root dir starts with '/', don't use /var/www as default starting point
+
+if [ "$action" == 'create' ]
+	then
+		### check if domain already exists
+		if [ -e $sitesAvailable$domain ]; then
+			echo -e $"This domain already exists.\nPlease Try Another one"
+			exit;
+		fi
+
+		### check if directory exists or not
+		if ! [ -d $root ]; then
+			### create the directory
+			mkdir $root
+			### give permission to root dir
+			chmod 755 root
+			### write test file in the new domain dir
+			if ! echo "<?php echo phpinfo(); ?>" > $root/phpinfo.php
+				then
+					echo $"ERROR: Not able to write in file $root/phpinfo.php. Please check permissions."
+					exit;
+			else
+					echo $"Added content to $root/phpinfo.php."
+			fi
+		fi
+
+		### create virtual host rules file
+		if ! echo "server {
+			listen   80;
+			root $root;
+			index index.php index.html index.htm;
+			server_name $domain;
+
+			# serve static files directly
+			location ~* \.(jpg|jpeg|gif|css|png|js|ico|html)\$ {
+				access_log off;
+				expires max;
+			}
+
+
+			# catch all
+			error_page 404 /index.php;
+
+			location / {
+
+                    try_files \$uri \$uri/ /index.php?\$query_string;
+
+                    # A bunch of perm page redirects from my old
+                    # site structure for SEO purposes. Not interesting.
+
+                    # include /etc/nginx/templates/redirects;
+
+            }
+
+			if (!-d \$request_filename) {
+            	rewrite ^/(.+)/\$ /\$1 permanent;
+		    }
+
+
+		    location ~* \.php\$ {
+		        try_files \$uri /index.php =404;
+		        # Server PHP config.
+		        fastcgi_pass                    unix:/run/php-fpm/php-fpm.sock;
+		        fastcgi_index                   index.php;
+		        fastcgi_split_path_info         ^(.+\.php)(/.+)\$;
+
+		        # Typical vars in here, nothing interesting.
+
+		        include                         /etc/nginx/fastcgi_params;
+		        fastcgi_param                   SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+
+		    }
+
+		    location ~ /\.ht {
+
+		            # Hells no, we usin nginx up in this mutha. (deny .htaccess)
+		            deny all;
+
+		    }
+
+		}" > $sitesAvailable$domain
+		then
+			echo -e $"There is an ERROR create $domain file"
+			exit;
+		else
+			echo -e $"\nNew Virtual Host Created\n"
+		fi
+
+		### Add domain in /etc/hosts
+		if ! echo "127.0.0.1	$domain" >> /etc/hosts
+			then
+				echo $"ERROR: Not able write in /etc/hosts"
+				exit;
+		else
+				echo -e $"Host added to /etc/hosts file \n"
+		fi
+
+		chown -R $owner:$group $root
+
+		### enable website
+		ln -s $sitesAvailable$domain $sitesEnable$domain
+
+		### restart Nginx
+		$restart
+
+		### show the finished message
+		echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: http://$domain \nAnd its located at $root"
+		exit;
+	else
+		### check whether domain already exists
+		if ! [ -e $sitesAvailable$domain ]; then
+			echo -e $"This domain dont exists.\nPlease Try Another one"
+			exit;
+		else
+			### Delete domain in /etc/hosts
+			newhost=${domain//./\\.}
+			sed -i "/$newhost/d" /etc/hosts
+
+			### disable website
+			rm $sitesEnable$domain
+
+			### restart Nginx
+			#service nginx restart
+			$restart
+			### Delete virtual host rules files
+			rm $sitesAvailable$domain
+		fi
+
+		### check if directory exists or not
+		if [ -d $root ]; then
+			echo -e $"Delete host root directory ? (s/n)"
+			read deldir
+
+			if [ "$deldir" == 's' -o "$deldir" == 'S' ]; then
+				### Delete the directory
+				rm -rf $root
+				echo -e $"Directory deleted"
+			else
+				echo -e $"Host directory conserved"
+			fi
+		else
+			echo -e $"Host directory not found. Ignored"
+		fi
+
+		### show the finished message
+		echo -e $"Complete!\nYou just removed Virtual Host $domain"
+		exit 0;
+fi
