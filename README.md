@@ -17,6 +17,10 @@ $ chmod +x /path/to/ng
 ```bash
 $ cd /usr/local/bin && sudo wget -O ng https://raw.githubusercontent.com/patrickcurl/ngTool/master/ng && sudo chmod +x /usr/local/bin/ng
 ```
+## CAVEAT ## 
+.dev domains are blocked from browsers now, I highly recommend only using .test. 
+On my system what I've done is enabled a global dns wildcard using dnsmasq, 
+this makes it so all .test domains are local and need no editing. 
 
 ## Config ##
 Open and edit the file as sudoer, change the owner, group, and restart variables as needed.
@@ -26,7 +30,7 @@ Open and edit the file as sudoer, change the owner, group, and restart variables
 Basic command line syntax:
 
 ```bash
-$ sudo ng [create | delete] [domain] [/full/path/to/project/dir]
+$ sudo ng [create | delete | enable | disable] [domain] [/full/path/to/project/dir]
 ```
 
 ### Examples ###
@@ -42,5 +46,12 @@ to delete a virtual host
 $ sudo ng delete mysite.dev
 ```
 
+```bash 
+$ sudo ng enable
+``` 
+
+```bash 
+$sudo ng enable domain.test
+```
 ## License ##
 MIT : Basically do whatever just provide copyright notice w/ all derivatives. 

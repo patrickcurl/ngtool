@@ -22,6 +22,40 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+regenerate_ssls(){
+	sitesAvailable = $1
+	sslConfig = $2
+	sslKey = $3
+	sslCert = $4
+    domains=`sed -n -e 's/^.*server_name //p' $sitesAvailable* | tr " " "\n" | sed '/^\s*$/d' | cut -d ';' -f1 | sort -u`
+    cat <<EOT> $sslConfig
+[ req ]
+req_extensions     = req_ext
+distinguished_name = req_distinguished_name
+prompt             = no
+
+[req_distinguished_name]
+commonName=localhost.test
+
+[req_ext]
+subjectAltName   = @alt_names
+
+[alt_names]
+EOT
+    count=1;
+    for domain in $domains; do
+        if [ "$domain" != '_' ]
+        then
+            let count++;
+            dns="DNS.$count = $domain";
+            echo $dns >> $sslConfig;
+        fi
+    done
+    sudo openssl req -x509 -config $sslConfig -extensions req_ext -nodes -days 730 -newkey rsa:2048 -sha256 -keyout $sslKey -out $sslCert
+}
+
+
+
 ### Set Language
 TEXTDOMAIN=virtualhost
 
@@ -29,30 +63,54 @@ TEXTDOMAIN=virtualhost
 action=$1
 domain=$2
 root=$3
-# Put owner/group that nginx must run over for your system. 
+
+### CONFIG SETTINGS
+# Put owner/group that nginx must run under for your system.
 # The default on ubuntu would be user: www-data group: www-data.
-owner=patrick
-group=users
-sitesEnable='/etc/nginx/sites-enabled/'
-sitesAvailable='/etc/nginx/sites-available/'
+# This is my personal settings for Arch linux. 
+owner=patrick #owner for chmoding -- this is the owner nginx uses.
+group=users #group for chmoding -- this is the group nginx uses.
+sitesEnabled='/etc/nginx/sites-enabled/' #sites-enabled path
+sitesAvailable='/etc/nginx/sites-available/' #sites-available path
+useHosts=false # make true if you do not have a global .test wildcard setup via dnsmasq or other.
+useSSL=true
+sslConfig='/etc/nginx/ssl/ssl_servers.cfg'
+sslKey='/etc/nginx/ssl/nginx.key'
+sslCert='/etc/nginx/ssl/nginx.crt'
 # Change this to match what your system uses.
 #arch
 restart='systemctl restart nginx'
 #ubuntu
 # restart=service nginx restart
 
+function restart_nginx(){
+	$restart
+	echo -e $"Nginx restarted!"
+}
+
+function check_version(){
+	current_version=$(echo VERSION)
+	new_version=$(curl https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION)
+	echo -e $"$current_version"
+	echo -e $"$new_version"
+	# diff VERSION < (curl https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION)
+}
+
+### END CONFIG SETTINGS
+
+
 if [ "$(whoami)" != 'root' ]; then
 	echo $"You have no permission to run $0 as non-root user. Use sudo"
 		exit 1;
 fi
 
-if [ "$action" != 'create' ] && [ "$action" != 'delete' ]
+if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'enable' ] && [ "$action" != 'disable' ]
 	then
-		echo $"You need to prompt for action (create or delete) -- Lower-case only"
+		echo $"You need to prompt for action (create, delete or enable or disable) -- Lower-case only"
 		exit 1;
 fi
 
-while [ "$domain" == "" ]
+while [ "$domain" == "" ] && [ "$action" != 'enable' ] && [ "$action" != 'disable' ]
 do
 	echo -e $"Please provide domain. e.g. mysite.dev"
 	read domain
@@ -94,9 +152,15 @@ if [ "$action" == 'create' ]
 		### create virtual host rules file
 		if ! echo "server {
 			listen   80;
+			listen [::]:80;
+			listen 443 ssl http2;
+    		listen [::]:443 ssl http2;
 			root $root;
 			index index.php index.html index.htm;
 			server_name $domain;
+			
+			ssl_certificate     $sslCert;
+			ssl_certificate_key $sslKey;
 
 			# serve static files directly
 			location ~* \.(jpg|jpeg|gif|css|png|js|ico|html)\$ {
@@ -152,48 +216,128 @@ if [ "$action" == 'create' ]
 		else
 			echo -e $"\nNew Virtual Host Created\n"
 		fi
-
-		### Add domain in /etc/hosts
-		if ! echo "127.0.0.1	$domain" >> /etc/hosts
-			then
-				echo $"ERROR: Not able write in /etc/hosts"
-				exit;
-		else
-				echo -e $"Host added to /etc/hosts file \n"
+		if [ "$useHosts" == true ]; then
+			### Add domain in /etc/hosts
+			if ! echo "127.0.0.1	$domain" >> /etc/hosts
+				then
+					echo $"ERROR: Not able write in /etc/hosts"
+					exit;
+			else
+					echo -e $"Host added to /etc/hosts file \n"
+			fi
 		fi
-
 		chown -R $owner:$group $root
 
 		### enable website
-		ln -s $sitesAvailable$domain $sitesEnable$domain
+		ln -s $sitesAvailable$domain $sitesEnabled$domain
+
+		### SETUP SSLS for all existing domains.
 
 		### restart Nginx
-		$restart
+		if [ "$useSSL" == true ]; then
+			regenerate_ssls $sitesAvailable $sslConfig $sslKey $sslCert
+		fi
+
+		restart_nginx
 
 		### show the finished message
 		echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: http://$domain \nAnd its located at $root"
 		exit;
+fi
+
+if [ "$action" == 'delete' ]; then
+	### check whether domain already exists
+	if ! [ -e $sitesAvailable$domain ]; then
+		echo -e $"This domain does not exists.\nPlease Try Another one"
+		exit;
 	else
-		### check whether domain already exists
-		if ! [ -e $sitesAvailable$domain ]; then
-			echo -e $"This domain dont exists.\nPlease Try Another one"
-			exit;
-		else
+		if [ "$useHosts" == true ]; then
 			### Delete domain in /etc/hosts
 			newhost=${domain//./\\.}
 			sed -i "/$newhost/d" /etc/hosts
-
-			### disable website
-			rm $sitesEnable$domain
-
-			### restart Nginx
-			#service nginx restart
-			$restart
-			### Delete virtual host rules files
-			rm $sitesAvailable$domain
 		fi
+		### disable website
+		rm $sitesEnabled$domain
 
-		### show the finished message
+		### restart Nginx
+		#service nginx restart
+		restart_nginx
+		### Delete virtual host rules files
+		rm $sitesAvailable$domain
 		echo -e $"Complete!\nYou just removed Virtual Host $domain. \nThe root folder still exists. You'll need to manually delete it."
-		exit 0;
+		exit;
+	fi
+fi
+
+if [ "$action" == 'enable' ]; then
+	if [ "$domain" == "" ]; then
+		echo -e $"No domain supplied, re-enabling all domains";
+		FILES=$sitesAvailable*
+		for f in $FILES
+		do
+			file=`basename $f`;
+			if [ -f "$sitesEnabled$file" ]; then
+				echo -e $"$file already linked, skipping."
+			else
+		    	echo -e $"Enabling: $file"
+		    	`sudo ln -s $sitesAvailable$file $sitesEnabled$file`
+		    fi
+		done
+		echo -e $"Complete! Nginx sites are now enabled."
+		exit;
+	else
+		if ! [ -f "$sitesAvailable$domain" ]; then 
+			echo -e $"Domain file missing from $sitesAvailable, please add it then try again."
+			exit;
+		fi
+		if [ -f "$sitesEnabled$domain" ]; then
+			echo -e $"Domain is already enabled, no need to renable."
+			exit;
+		else
+			`sudo ln -s $sitesAvailable$domain $sitesEnabled$domain`
+			echo -e $"Domain $domain has been enabled. Happy coding!" 
+			restart_nginx
+			exit;
+		fi
+	fi
+fi
+
+if [ "$action" == 'disable' ]; then
+	if [ "$domain" == "" ]; then
+		echo -e $"No domain supplied, disabling requires a domain! If you really want to disable ALL domains then try: ng disable all";
+		exit;
+	fi
+	
+	if [ "$domain" == "all" ]; then
+		FILES=$sitesEnabled*
+		for f in $FILES 
+		do
+			file=`basename $f`
+			if [ -f "$f" ]; then
+				`rm -rf $f`
+				if [ -f "$f" ]; then 
+					echo -e $"Error: $file was unable to be disabled"
+				else
+					echo -e $"$file as been disabled successfully."
+					restart_nginx
+				fi
+			else
+				echo -e $"File does not exist, skipping"
+			fi
+		done
+	fi
+	if [ "$domain" != "all" ] && [ "$domain" != "" ]; then
+		file="$sitesEnabled$domain"
+		if [ -f "$file" ]; then
+			`rm -rf $file`
+			if ! [ -f "$file" ]; then
+				echo -e $"Site $domain has been disabled!"
+				restart_nginx
+			else
+				echo -e $"Something went wrong, unable to disable site!"
+			fi
+		else 
+			echo -e $"File does not exist. Did you spell it right?"
+		fi
+	fi
 fi
