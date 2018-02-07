@@ -22,6 +22,34 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+### Set Language
+TEXTDOMAIN=virtualhost
+
+### Set default parameters
+action=$1
+domain=$2
+root=$3
+
+### CONFIG SETTINGS
+# Put owner/group that nginx must run under for your system.
+# The default on ubuntu would be user: www-data group: www-data.
+# This is my personal settings for Arch linux.
+owner=patrick #owner for chmoding -- this is the owner nginx uses.
+group=users #group for chmoding -- this is the group nginx uses.
+sitesEnabled='/etc/nginx/sites-enabled/' #sites-enabled path
+sitesAvailable='/etc/nginx/sites-available/' #sites-available path
+useHosts=false # make true if you do not have a global .test wildcard setup via dnsmasq or other.
+useSSL=true
+sslConfig='/etc/nginx/ssl/ssl_servers.cfg'
+sslKey='/etc/nginx/ssl/nginx.key'
+sslCert='/etc/nginx/ssl/nginx.crt'
+# Change this to match what your system uses.
+#arch
+restart='systemctl restart nginx'
+#ubuntu
+# restart=service nginx restart
+### END CONFIG SETTINGS
+
 regenerate_ssls(){
 	sitesAvailable = $1
 	sslConfig = $2
@@ -54,35 +82,6 @@ EOT
     sudo openssl req -x509 -config $sslConfig -extensions req_ext -nodes -days 730 -newkey rsa:2048 -sha256 -keyout $sslKey -out $sslCert
 }
 
-
-
-### Set Language
-TEXTDOMAIN=virtualhost
-
-### Set default parameters
-action=$1
-domain=$2
-root=$3
-
-### CONFIG SETTINGS
-# Put owner/group that nginx must run under for your system.
-# The default on ubuntu would be user: www-data group: www-data.
-# This is my personal settings for Arch linux.
-owner=patrick #owner for chmoding -- this is the owner nginx uses.
-group=users #group for chmoding -- this is the group nginx uses.
-sitesEnabled='/etc/nginx/sites-enabled/' #sites-enabled path
-sitesAvailable='/etc/nginx/sites-available/' #sites-available path
-useHosts=false # make true if you do not have a global .test wildcard setup via dnsmasq or other.
-useSSL=true
-sslConfig='/etc/nginx/ssl/ssl_servers.cfg'
-sslKey='/etc/nginx/ssl/nginx.key'
-sslCert='/etc/nginx/ssl/nginx.crt'
-# Change this to match what your system uses.
-#arch
-restart='systemctl restart nginx'
-#ubuntu
-# restart=service nginx restart
-
 function restart_nginx(){
 	$restart
 	echo -e $"Nginx restarted!"
@@ -94,7 +93,7 @@ function check_version(){
 	echo -e "Checking for updates.\n";
 	CURRENT_VERSION=`cat VERSION`
 	echo -e $"$CURRENT_VERSION"
-	NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION`"
+	NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngtool/master/VERSION`"
 	if [ $(version $CURRENT_VERSION) -lt $(version $NEW_VERSION) ]; then
 		echo -e $"There is an update available (Current: $CURRENT_VERSION | New: $NEW_VERSION) to update do the following:\n"
 		SCRIPT="$(readlink --canonicalize-existing "$0")"
@@ -107,7 +106,7 @@ function check_version(){
 	# diff VERSION < (curl https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION)
 }
 
-### END CONFIG SETTINGS
+
 
 check_version
 
