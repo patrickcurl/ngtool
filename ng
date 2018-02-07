@@ -93,9 +93,8 @@ function version {
 function check_version {
     echo -e "Checking for updates.\n";
     CURRENT_VERSION=`cat VERSION`
-    echo -e $"$CURRENT_VERSION"
-    NEW_VERSION="`wget -qO- \
-    https://raw.githubusercontent.com/patrickcurl/ngtool/master/VERSION`"
+    NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngtool/master/VERSION`"
+
     if [ $(version $CURRENT_VERSION) -lt $(version $NEW_VERSION) ]; then
         echo -e $"There is an update available (Current: $CURRENT_VERSION | New: $NEW_VERSION) to update do the following:\n"
         SCRIPT="$(readlink --canonicalize-existing "$0")"
