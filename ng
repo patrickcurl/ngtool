@@ -89,14 +89,14 @@ function restart_nginx(){
 }
 
 function check_version(){
-	echo -e "Checking for updates.";
+	echo -e "Checking for updates.\n";
 	CURRENT_VERSION=`echo VERSION`
 	NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION`"
 	if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
-		echo -e $"updating...."
+		echo -e $"There is an update available to update do the following:\n"
 		SCRIPT="$(readlink --canonicalize-existing "$0")"
 		SCRIPT_PATH="$(dirname $SCRIPT)"
-		`cd $SCRIPT_PATH && git fetch origin && git reset --hard origin/master`
+		echo -e $"cd $SCRIPT_PATH && git pull origin master\n"
 		#echo -e "There is an update available, please run: ng-self-update or cd to the directory you installed it to and run: git pull origin master"
 	else
 		echo -e $"You already have the latest version";
@@ -130,6 +130,7 @@ done
 ### if root dir starts with '/', don't use /var/www as default starting point
 
 if [ "$action" == 'create' ]
+	echo -e $"Creating $domain...\n"
 	then
 		while [ "$root" == "" ]
 		do
@@ -255,6 +256,7 @@ if [ "$action" == 'create' ]
 fi
 
 if [ "$action" == 'delete' ]; then
+	echo -e $"Deleting $domain...\n"
 	### check whether domain already exists
 	if ! [ -e $sitesAvailable$domain ]; then
 		echo -e $"This domain does not exists.\nPlease Try Another one"
@@ -295,6 +297,7 @@ if [ "$action" == 'enable' ]; then
 		echo -e $"Complete! Nginx sites are now enabled."
 		exit;
 	else
+		echo -e $"Enabling $domain...\n"
 		if ! [ -f "$sitesAvailable$domain" ]; then 
 			echo -e $"Domain file missing from $sitesAvailable, please add it then try again."
 			exit;
@@ -312,6 +315,7 @@ if [ "$action" == 'enable' ]; then
 fi
 
 if [ "$action" == 'disable' ]; then
+	echo -e $"Disabling $domain...\n"
 	if [ "$domain" == "" ]; then
 		echo -e $"No domain supplied, disabling requires a domain! If you really want to disable ALL domains then try: ng disable all";
 		exit;
