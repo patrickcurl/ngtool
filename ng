@@ -50,12 +50,13 @@ restart='systemctl restart nginx'
 # restart=service nginx restart
 ### END CONFIG SETTINGS
 
-regenerate_ssls(){
-    sitesAvailable = $1
-    sslConfig = $2
-    sslKey = $3
-    sslCert = $4
-    domains=`sed -n -e 's/^.*server_name //p' $sitesAvailable* | tr " " "\n" | sed '/^\s*$/d' | cut -d ';' -f1 | sort -u`
+function regenerate_ssls {
+    echo $sitesAvailable
+    # sitesAvailable = $1
+    # sslConfig = $2
+    # sslKey = $3
+    # sslCert = $4
+    SSL_DOMAINS=`sed -n -e 's/^.*server_name //p' $sitesAvailable* | tr " " "\n" | sed '/^\s*$/d' | cut -d ';' -f1 | sort -u`
     cat <<EOT> $sslConfig
 [ req ]
 req_extensions     = req_ext
@@ -71,10 +72,10 @@ subjectAltName   = @alt_names
 [alt_names]
 EOT
     count=1;
-    for domain in $domains; do
-        if [ "$domain" != '_' ]; then
+    for SDOMAIN in $SSL_DOMAINS; do
+        if [ "$SDOMAIN" != '_' ]; then
             let count++;
-            dns="DNS.$count = $domain";
+            dns="DNS.$count = $SDOMAIN";
             echo $dns >> $sslConfig;
         fi
     done
@@ -92,13 +93,13 @@ function version {
 
 function check_version {
     echo -e "Checking for updates.\n";
-    CURRENT_VERSION=`cat VERSION`
+    SCRIPT="$(readlink --canonicalize-existing "$0")"
+    SCRIPT_PATH="$(dirname $SCRIPT)"
+    CURRENT_VERSION=`cat $SCRIPT_PATH/VERSION`
     NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngtool/master/VERSION`"
 
-    if [ $(version $CURRENT_VERSION) -lt $(version $NEW_VERSION) ]; then
+    if [ $CURRENT_VERSION != "" ] && [ $(version $CURRENT_VERSION) -lt $(version $NEW_VERSION) ]; then
         echo -e $"There is an update available (Current: $CURRENT_VERSION | New: $NEW_VERSION) to update do the following:\n"
-        SCRIPT="$(readlink --canonicalize-existing "$0")"
-        SCRIPT_PATH="$(dirname $SCRIPT)"
         echo -e $"cd $SCRIPT_PATH && git pull origin master\n"
     else
         echo -e $"You already have the latest version";
@@ -129,8 +130,6 @@ while [ "$domain" == "" ]; do
     fi
 done
 
-
-
 ### if root dir starts with '/', don't use /var/www as default starting point
 if [ "$action" == "create" ]; then
     echo -e $"Creating $domain...\n"
@@ -159,7 +158,6 @@ if [ "$action" == "create" ]; then
                 echo $"Added content to $root/phpinfo.php."
         fi
     fi
-
     ### create virtual host rules file
     if ! echo "server {
         listen   80;
@@ -238,7 +236,6 @@ if [ "$action" == "create" ]; then
         fi
     fi
     chown -R $owner:$group $root
-
     ### enable website
     ln -s $sitesAvailable$domain $sitesEnabled$domain
 
@@ -292,7 +289,8 @@ if [ "$action" == "enable" ]; then
                 `sudo ln -s $sitesAvailable$file $sitesEnabled$file`
             fi
         done
-        echo -e $"Complete! Nginx sites are now enabled."
+        restart_nginx
+        echo -e $"Complete! ALL Nginx sites are now enabled. Happy coding!"
         exit;
     else
         echo -e $"Enabling $domain...\n"
