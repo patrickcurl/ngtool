@@ -92,7 +92,7 @@ function check_version(){
 	echo -e "Checking for updates.\n";
 	CURRENT_VERSION=`echo VERSION`
 	NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION`"
-	if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
+	if [ "$CURRENT_VERSION" -gt "$NEW_VERSION" ]; then
 		echo -e $"There is an update available to update do the following:\n"
 		SCRIPT="$(readlink --canonicalize-existing "$0")"
 		SCRIPT_PATH="$(dirname $SCRIPT)"
