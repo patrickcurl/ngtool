@@ -89,15 +89,24 @@ function restart_nginx(){
 }
 
 function check_version(){
-	current_version=$(echo VERSION)
-	new_version=$(curl https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION)
-	echo -e $"$current_version"
-	echo -e $"$new_version"
+	echo -e "Checking for updates.";
+	CURRENT_VERSION=`echo VERSION`
+	NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION`"
+	if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
+		echo -e $"updating...."
+		SCRIPT="$(readlink --canonicalize-existing "$0")"
+		SCRIPT_PATH="$(dirname $SCRIPT)"
+		`cd $SCRIPT_PATH && git fetch origin && git reset --hard origin/master`
+		#echo -e "There is an update available, please run: ng-self-update or cd to the directory you installed it to and run: git pull origin master"
+	else
+		echo -e $"You already have the latest version";
+	fi
 	# diff VERSION < (curl https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION)
 }
 
 ### END CONFIG SETTINGS
 
+check_version
 
 if [ "$(whoami)" != 'root' ]; then
 	echo $"You have no permission to run $0 as non-root user. Use sudo"
