@@ -51,10 +51,10 @@ restart='systemctl restart nginx'
 ### END CONFIG SETTINGS
 
 regenerate_ssls(){
-	sitesAvailable = $1
-	sslConfig = $2
-	sslKey = $3
-	sslCert = $4
+    sitesAvailable = $1
+    sslConfig = $2
+    sslKey = $3
+    sslCert = $4
     domains=`sed -n -e 's/^.*server_name //p' $sitesAvailable* | tr " " "\n" | sed '/^\s*$/d' | cut -d ';' -f1 | sort -u`
     cat <<EOT> $sslConfig
 [ req ]
@@ -72,121 +72,119 @@ subjectAltName   = @alt_names
 EOT
     count=1;
     for domain in $domains; do
-        if [ "$domain" != '_' ]
-        then
+        if [ "$domain" != '_' ]; then
             let count++;
             dns="DNS.$count = $domain";
             echo $dns >> $sslConfig;
         fi
     done
-    sudo openssl req -x509 -config $sslConfig -extensions req_ext -nodes -days 730 -newkey rsa:2048 -sha256 -keyout $sslKey -out $sslCert
+    `sudo openssl req -x509 -config $sslConfig -extensions req_ext -nodes -days 730 -newkey rsa:2048 -sha256 -keyout $sslKey -out $sslCert`
 }
 
-function restart_nginx(){
-	$restart
-	echo -e $"Nginx restarted!"
+function restart_nginx {
+    $restart
+    echo -e $"Nginx restarted!"
 }
 
-function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
-
-function check_version(){
-	echo -e "Checking for updates.\n";
-	CURRENT_VERSION=`cat VERSION`
-	echo -e $"$CURRENT_VERSION"
-	NEW_VERSION="`wget -qO- https://raw.githubusercontent.com/patrickcurl/ngtool/master/VERSION`"
-	if [ $(version $CURRENT_VERSION) -lt $(version $NEW_VERSION) ]; then
-		echo -e $"There is an update available (Current: $CURRENT_VERSION | New: $NEW_VERSION) to update do the following:\n"
-		SCRIPT="$(readlink --canonicalize-existing "$0")"
-		SCRIPT_PATH="$(dirname $SCRIPT)"
-		echo -e $"cd $SCRIPT_PATH && git pull origin master\n"
-		#echo -e "There is an update available, please run: ng-self-update or cd to the directory you installed it to and run: git pull origin master"
-	else
-		echo -e $"You already have the latest version";
-	fi
-	# diff VERSION < (curl https://raw.githubusercontent.com/patrickcurl/ngTool/master/VERSION)
+function version {
+    echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }';
 }
 
+function check_version {
+    echo -e "Checking for updates.\n";
+    CURRENT_VERSION=`cat VERSION`
+    echo -e $"$CURRENT_VERSION"
+    NEW_VERSION="`wget -qO- \
+    https://raw.githubusercontent.com/patrickcurl/ngtool/master/VERSION`"
+    if [ $(version $CURRENT_VERSION) -lt $(version $NEW_VERSION) ]; then
+        echo -e $"There is an update available (Current: $CURRENT_VERSION | New: $NEW_VERSION) to update do the following:\n"
+        SCRIPT="$(readlink --canonicalize-existing "$0")"
+        SCRIPT_PATH="$(dirname $SCRIPT)"
+        echo -e $"cd $SCRIPT_PATH && git pull origin master\n"
+    else
+        echo -e $"You already have the latest version";
+    fi
+}
 
+if [ "$(whoami)" != 'root' ]; then
+    echo $"You have no permission to run \
+    $0 as non-root user. Use sudo"
+        exit 1;
+fi
 
 check_version
 
-if [ "$(whoami)" != 'root' ]; then
-	echo $"You have no permission to run $0 as non-root user. Use sudo"
-		exit 1;
+if [ "$action" != "create" ] && [ "$action" != "delete" ] \
+    && [ "$action" != "enable" ] && [ "$action" != "disable" ]; then
+        echo $"You need to prompt for action \
+        (create, delete or enable or disable) -- Lower-case only"
+        exit;
 fi
 
-if [ "$action" != "create" ] && [ "$action" != "delete" ] && [ "$action" != "enable" ] && [ "$action" != "disable" ]
-	then
-		echo $"You need to prompt for action (create, delete or enable or disable) -- Lower-case only"
-		exit;
-fi
-
-while [ "$domain" == "" ]
-do
-	if [ "$action" == "create" ] ||  [ "$action" == "delete" ]; then
-		echo -e $"Please provide domain. e.g. mysite.dev"
-		read domain
-	else
-		break
-	fi
+while [ "$domain" == "" ]; do
+    if [ "$action" == "create" ] ||  [ "$action" == "delete" ]; then
+        echo -e $"Please provide domain. e.g. mysite.dev"
+        read domain
+    else
+        break
+    fi
 done
 
 
 
 ### if root dir starts with '/', don't use /var/www as default starting point
 if [ "$action" == "create" ]; then
-	echo -e $"Creating $domain...\n"
-	while [ "$root" == "" ]
-	do
-		echo -e $"Please provide a full directory e.g. /home/user/projects/myproject/public"
-		read root
-	done
-	### check if domain already exists
-	if [ -e $sitesAvailable$domain ]; then
-		echo -e $"This domain already exists.\nPlease Try Another one"
-		exit;
-	fi
+    echo -e $"Creating $domain...\n"
+    while [ "$root" == "" ]; do
+        echo -e $"Please provide a full directory e.g. /home/user/projects/myproject/public"
+        read root
+    done
+    ### check if domain already exists
+    if [ -e $sitesAvailable$domain ]; then
+        echo -e $"This domain already exists.\nPlease Try Another one"
+        exit;
+    fi
 
-	### check if directory exists or not
-	if ! [ -d $root ]; then
-		### create the directory
-		mkdir $root
-		### give permission to root dir
-		chmod 755 root
-		### write test file in the new domain dir
-		if ! echo "<?php echo phpinfo(); ?>" > $root/phpinfo.php
-			then
-				echo $"ERROR: Not able to write in file $root/phpinfo.php. Please check permissions."
-				exit;
-		else
-				echo $"Added content to $root/phpinfo.php."
-		fi
-	fi
+    ### check if directory exists or not
+    if ! [ -d $root ]; then
+        ### create the directory
+        mkdir $root
+        ### give permission to root dir
+        chmod 755 root
+        ### write test file in the new domain dir
+        if ! echo "<?php echo phpinfo(); ?>" > $root/phpinfo.php
+            then
+                echo $"ERROR: Not able to write in file $root/phpinfo.php. Please check permissions."
+                exit;
+        else
+                echo $"Added content to $root/phpinfo.php."
+        fi
+    fi
 
-	### create virtual host rules file
-	if ! echo "server {
-		listen   80;
-		listen [::]:80;
-		listen 443 ssl http2;
-		listen [::]:443 ssl http2;
-		root $root;
-		index index.php index.html index.htm;
-		server_name $domain;
+    ### create virtual host rules file
+    if ! echo "server {
+        listen   80;
+        listen [::]:80;
+        listen 443 ssl http2;
+        listen [::]:443 ssl http2;
+        root $root;
+        index index.php index.html index.htm;
+        server_name $domain;
 
-		ssl_certificate     $sslCert;
-		ssl_certificate_key $sslKey;
+        ssl_certificate     $sslCert;
+        ssl_certificate_key $sslKey;
 
-		# serve static files directly
-		location ~* \.(jpg|jpeg|gif|css|png|js|ico|html)\$ {
-			access_log off;
-			expires max;
-		}
+        # serve static files directly
+        location ~* \.(jpg|jpeg|gif|css|png|js|ico|html)\$ {
+            access_log off;
+            expires max;
+        }
 
 
-		# catch all
-		error_page 404 /index.php;
+        # catch all
+        error_page 404 /index.php;
 
-		location / {
+        location / {
 
                 try_files \$uri \$uri/ /index.php?\$query_string;
 
@@ -197,164 +195,160 @@ if [ "$action" == "create" ]; then
 
         }
 
-		if (!-d \$request_filename) {
-        	rewrite ^/(.+)/\$ /\$1 permanent;
-	    }
+        if (!-d \$request_filename) {
+            rewrite ^/(.+)/\$ /\$1 permanent;
+        }
 
 
-	    location ~* \.php\$ {
-	        try_files \$uri /index.php =404;
-	        # Server PHP config.
-	        fastcgi_pass                    unix:/run/php-fpm/php-fpm.sock;
-	        fastcgi_index                   index.php;
-	        fastcgi_split_path_info         ^(.+\.php)(/.+)\$;
+        location ~* \.php\$ {
+            try_files \$uri /index.php =404;
+            # Server PHP config.
+            fastcgi_pass                    unix:/run/php-fpm/php-fpm.sock;
+            fastcgi_index                   index.php;
+            fastcgi_split_path_info         ^(.+\.php)(/.+)\$;
 
-	        # Typical vars in here, nothing interesting.
+            # Typical vars in here, nothing interesting.
 
-	        include                         /etc/nginx/fastcgi_params;
-	        fastcgi_param                   SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            include                         /etc/nginx/fastcgi_params;
+            fastcgi_param                   SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
 
-	    }
+        }
 
-	    location ~ /\.ht {
+        location ~ /\.ht {
 
-	            # Hells no, we usin nginx up in this mutha. (deny .htaccess)
-	            deny all;
+                # Hells no, we usin nginx up in this mutha. (deny .htaccess)
+                deny all;
 
-	    }
+        }
 
-	}" > $sitesAvailable$domain
-	then
-		echo -e $"There is an ERROR create $domain file"
-		exit;
-	else
-		echo -e $"\nNew Virtual Host Created\n"
-	fi
-	if [ "$useHosts" == true ]; then
-		### Add domain in /etc/hosts
-		if ! echo "127.0.0.1	$domain" >> /etc/hosts
-			then
-				echo $"ERROR: Not able write in /etc/hosts"
-				exit;
-		else
-				echo -e $"Host added to /etc/hosts file \n"
-		fi
-	fi
-	chown -R $owner:$group $root
+    }" > $sitesAvailable$domain
+    then
+        echo -e $"There is an ERROR create $domain file"
+        exit;
+    else
+        echo -e $"\nNew Virtual Host Created\n"
+    fi
+    if [ "$useHosts" == true ]; then
+        ### Add domain in /etc/hosts
+        if ! echo "127.0.0.1    $domain" >> /etc/hosts
+            then
+            echo $"ERROR: Not able write in /etc/hosts"
+            exit;
+        else
+            echo -e $"Host added to /etc/hosts file \n"
+        fi
+    fi
+    chown -R $owner:$group $root
 
-	### enable website
-	ln -s $sitesAvailable$domain $sitesEnabled$domain
+    ### enable website
+    ln -s $sitesAvailable$domain $sitesEnabled$domain
 
-	### SETUP SSLS for all existing domains.
+    ### SETUP SSLS for all existing domains.
 
-	### restart Nginx
-	if [ "$useSSL" == true ]; then
-		regenerate_ssls $sitesAvailable $sslConfig $sslKey $sslCert
-	fi
+    ### restart Nginx
+    if [ "$useSSL" == true ]; then
+        regenerate_ssls $sitesAvailable $sslConfig $sslKey $sslCert
+    fi
 
-	restart_nginx
+    restart_nginx
 
-	### show the finished message
-	echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: http://$domain \nAnd its located at $root"
-	exit;
+    ### show the finished message
+    echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: http://$domain \nAnd its located at $root"
+    exit;
 fi
 
 if [ "$action" == "delete" ]; then
-	echo -e $"Deleting $domain...\n"
-	### check whether domain already exists
-	if ! [ -e $sitesAvailable$domain ]; then
-		echo -e $"This domain does not exists.\nPlease Try Another one"
-		exit;
-	else
-		if [ "$useHosts" == true ]; then
-			### Delete domain in /etc/hosts
-			newhost=${domain//./\\.}
-			sed -i "/$newhost/d" /etc/hosts
-		fi
-		### disable website
-		rm $sitesEnabled$domain
+    echo -e $"Deleting $domain...\n"
+    ### check whether domain already exists
+    if ! [ -e $sitesAvailable$domain ]; then
+        echo -e $"This domain does not exists.\nPlease Try Another one"
+        exit;
+    else
+        if [ "$useHosts" == true ]; then
+            ### Delete domain in /etc/hosts
+            newhost=${domain//./\\.}
+            sed -i "/$newhost/d" /etc/hosts
+        fi
+        ### disable website
+        rm $sitesEnabled$domain
 
-		### restart Nginx
-		#service nginx restart
-		restart_nginx
-		### Delete virtual host rules files
-		rm $sitesAvailable$domain
-		echo -e $"Complete!\nYou just removed Virtual Host $domain. \nThe root folder still exists. You'll need to manually delete it."
-		exit;
-	fi
+        ### restart Nginx
+        #service nginx restart
+        restart_nginx
+        ### Delete virtual host rules files
+        rm $sitesAvailable$domain
+        echo -e $"Complete!\nYou just removed Virtual Host $domain. \nThe root folder still exists. You'll need to manually delete it."
+        exit;
+    fi
 fi
 
 if [ "$action" == "enable" ]; then
-	if [ "$domain" == "" ]; then
-		echo -e $"No domain supplied, re-enabling all domains";
-		FILES=$sitesAvailable*
-		for f in $FILES
-		do
-			file=`basename $f`;
-			if ! [ -f "$sitesEnabled$file" ]; then
-				# echo -e $"$file already linked, skipping."
-			# else
-		    	echo -e $"Enabling: $file"
-		    	`sudo ln -s $sitesAvailable$file $sitesEnabled$file`
-		    fi
-		done
-		echo -e $"Complete! Nginx sites are now enabled."
-		exit;
-	else
-		echo -e $"Enabling $domain...\n"
-		if ! [ -f "$sitesAvailable$domain" ]; then
-			echo -e $"Domain file missing from $sitesAvailable, please add it then try again."
-			exit;
-		fi
-		if [ -f "$sitesEnabled$domain" ]; then
-			echo -e $"Domain is already enabled, no need to renable."
-			exit;
-		else
-			`sudo ln -s $sitesAvailable$domain $sitesEnabled$domain`
-			echo -e $"Domain $domain has been enabled. Happy coding!"
-			restart_nginx
-			exit;
-		fi
-	fi
+    if [ "$domain" == "" ]; then
+        echo -e $"No domain supplied, re-enabling all domains";
+        FILES=$sitesAvailable*
+        for f in $FILES; do
+            file=`basename $f`;
+            if ! [ -f "$sitesEnabled$file" ]; then
+                echo -e $"Enabling: $file"
+                `sudo ln -s $sitesAvailable$file $sitesEnabled$file`
+            fi
+        done
+        echo -e $"Complete! Nginx sites are now enabled."
+        exit;
+    else
+        echo -e $"Enabling $domain...\n"
+        if ! [ -f "$sitesAvailable$domain" ]; then
+            echo -e $"Domain file missing from $sitesAvailable, please add it then try again."
+            exit;
+        fi
+        if [ -f "$sitesEnabled$domain" ]; then
+            echo -e $"Domain is already enabled, no need to renable."
+            exit;
+        else
+            `sudo ln -s $sitesAvailable$domain $sitesEnabled$domain`
+            echo -e $"Domain $domain has been enabled. Happy coding!"
+            restart_nginx
+            exit;
+        fi
+    fi
 fi
 
 if [ "$action" == "disable" ]; then
-	echo -e $"Disabling $domain...\n"
-	if [ "$domain" == "" ]; then
-		echo -e $"No domain supplied, disabling requires a domain! If you really want to disable ALL domains then try: ng disable all";
-		exit;
-	fi
+    echo -e $"Disabling $domain...\n"
+    if [ "$domain" == "" ]; then
+        echo -e $"No domain supplied, disabling requires a domain! \nIf you really want to disable ALL domains then try: ng disable all"
+        exit;
+    fi
 
-	if [ "$domain" == "all" ]; then
-		FILES=$sitesEnabled*
-		for f in $FILES
-		do
-			file=`basename $f`
-			if [ -f "$f" ]; then
-				`rm -rf $f`
-				if [ -f "$f" ]; then
-					echo -e $"Error: $file was unable to be disabled"
-				else
-					echo -e $"$file as been disabled successfully."
-					restart_nginx
-				fi
-			else
-				echo -e $"File does not exist, skipping"
-			fi
-		done
-	fi
-	if [ "$domain" != "all" ] && [ "$domain" != "" ]; then
-		file="$sitesEnabled$domain"
-		if [ -f "$file" ]; then
-			`rm -rf $file`
-			if ! [ -f "$file" ]; then
-				echo -e $"Site $domain has been disabled!"
-				restart_nginx
-			else
-				echo -e $"Something went wrong, unable to disable site!"
-			fi
-		else
-			echo -e $"File does not exist. Did you spell it right?"
-		fi
-	fi
+    if [ "$domain" == "all" ]; then
+        FILES=$sitesEnabled*
+        for f in $FILES; do
+            file=`basename $f`
+            if [ -f "$f" ]; then
+                `rm -rf $f`
+                if [ -f "$f" ]; then
+                    echo -e $"Error: $file was unable to be disabled"
+                else
+                    echo -e $"$file as been disabled successfully."
+                fi
+            else
+                echo -e $"File does not exist, skipping"
+            fi
+        done
+        restart_nginx
+    fi
+    if [ "$domain" != "all" ] && [ "$domain" != "" ]; then
+        file="$sitesEnabled$domain"
+        if [ -f "$file" ]; then
+            `rm -rf $file`
+            if ! [ -f "$file" ]; then
+                echo -e $"Site $domain has been disabled!"
+            else
+                echo -e $"Something went wrong, unable to disable site!"
+            fi
+        else
+            echo -e $"File does not exist. Did you spell it right?"
+        fi
+        restart_nginx
+    fi
 fi
