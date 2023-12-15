@@ -1,5 +1,4 @@
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=Y2JHAQRU77CCE)
-
+Support Me by going to my Etsy store : http://myjarofhope.etsy.com
 ===========
 Bash Script to allow create or delete nginx virtual hosts on linux in a quick way.
 
